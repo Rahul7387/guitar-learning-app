@@ -2,7 +2,7 @@
 
 Learn guitar by playing. Fretline listens through your microphone and tells you, note by note and chord by chord, whether you played it right.
 
-**Live app:** https://rahul7387.github.io/fretline/
+**Live app:** https://rahul7387.github.io/guitar-learning-app/
 
 ## What's inside
 
@@ -18,7 +18,7 @@ Learn guitar by playing. Fretline listens through your microphone and tells you,
 
 ## Install on Android
 
-1. Open https://rahul7387.github.io/fretline/ in Chrome.
+1. Open https://rahul7387.github.io/guitar-learning-app/ in Chrome.
 2. Tap the menu (three dots), then **Install app** (or **Add to Home screen**).
 3. Open Fretline from your home screen. It runs full screen and works offline after the first visit.
 
