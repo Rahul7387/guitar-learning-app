@@ -209,6 +209,12 @@ ol.lessons .rec .t::after{content:"Next";margin-left:8px;font-size:11px;font-wei
 .legend .dot.acc{background:var(--accent)}
 .legend .dot.ring{background:transparent;box-shadow:inset 0 0 0 3px var(--accent)}
 .legend .dot.tone{background:var(--tone);box-shadow:inset 0 0 0 1px var(--board)}
+.chordvis{display:inline-block;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:16px}
+.wx-h{margin:14px 0 6px;font-size:14px}
+.chordtbl{border-collapse:collapse;margin-top:2px;font-size:14px}
+.chordtbl th,.chordtbl td{padding:4px 16px 4px 0;text-align:left;border-bottom:1px solid var(--line)}
+.chordtbl th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.03em}
+.chordtbl .muted{color:var(--muted);font-size:12px}
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,8px);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-weight:600;font-size:14px;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;z-index:50;max-width:90vw;text-align:center}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 
@@ -784,6 +790,27 @@ function makeChord(n,fr,fullPcs){
   c.fullKey=fullPcs?[...new Set(fullPcs)].sort((a,b)=>a-b).join(","):c.key;
   const fretted=fr.filter(f=>f>0); c.minF=fretted.length?Math.min(...fretted):0; c.maxF=fretted.length?Math.max(...fretted):0;
   return c;
+}
+/* Heuristic fretting-hand finger numbers (1=index..4=pinky) for a fret array. Detects a barre
+   (two or more strings fretted at the shared lowest fret, with nothing lower in between) and
+   assigns the rest low-to-high fret, ascending string, like most players would read the shape. */
+function assignFingers(fr){
+  const idx=[...Array(6).keys()].filter(i=>fr[i]>0), out=new Array(6).fill(null);
+  if(!idx.length) return out;
+  const minF=Math.min(...idx.map(i=>fr[i])), atMin=idx.filter(i=>fr[i]===minF);
+  let barre=false;
+  if(atMin.length>=2){
+    const first=Math.min(...atMin), last=Math.max(...idx);
+    barre=true; for(let i=first;i<=last;i++) if(fr[i]>=0&&fr[i]<minF){ barre=false; break; }
+  }
+  if(barre){
+    const first=Math.min(...atMin), last=Math.max(...idx);
+    for(let i=first;i<=last;i++) if(fr[i]===minF) out[i]=1;
+    let next=2; for(const i of idx.filter(i=>fr[i]>minF).sort((a,b)=>fr[a]-fr[b]||a-b)) out[i]=Math.min(4,next++);
+  } else {
+    let next=1; for(const i of idx.slice().sort((a,b)=>fr[a]-fr[b]||a-b)) out[i]=Math.min(4,next++);
+  }
+  return out;
 }
 
 /* Chords used by the built-in lessons */
@@ -1398,20 +1425,41 @@ function fretboardSVG(marks,maxFret=15,opts={}){
   if(opts.clickable) for(let s1=1;s1<=6;s1++) for(let f=0;f<=maxFret;f++){ const y=top+(6-s1)*gap; const x=f===0?L-34:L+(f-1)*sp; s+=`<rect class="hit" data-s="${s1}" data-f="${f}" x="${x}" y="${y-gap/2}" width="${f===0?32:sp}" height="${gap}" rx="6"><title>${SORD[s1]} string, ${f?"fret "+f:"open"}</title></rect>`; }
   return s+"</svg>";
 }
+const CHORD_SC={6:"#EF5350",5:"#F2C94C",4:"#4C9AFF",3:"#FF8A3D",2:"#3DD68C",1:"#B07CFF"};
+/* Horizontal diagram: strings run top (low E, string 6) to bottom (high e, string 1), frets
+   run left to right, matching the Tab/Scale-library convention used elsewhere in the app. */
 function chordSVG(c,scale=1){
   const fr=c.fr, fretted=fr.filter(f=>f>0), mx=Math.max(0,...fretted);
-  const base=mx>4?Math.min(...fretted):1, x0=26, dx=22, y0=40, dy=30, W=x0*2+dx*5+8, H=y0+dy*4+14;
+  const base=mx>4?Math.min(...fretted):1, cols=4;
+  const L=46, sp=38, top=14, gap=26, W=L+cols*sp+16, H=top+gap*5+30;
+  const fingers=assignFingers(fr);
   let s=`<svg viewBox="0 0 ${W} ${H}" width="${Math.round(W*scale)}" height="${Math.round(H*scale)}" role="img" aria-label="${c.n} chord diagram">`;
-  for(let i=0;i<6;i++) s+=`<line x1="${x0+i*dx}" y1="${y0}" x2="${x0+i*dx}" y2="${y0+dy*4}" stroke="var(--chart)" stroke-width="2"/>`;
-  for(let k=0;k<=4;k++) s+=`<line x1="${x0}" y1="${y0+k*dy}" x2="${x0+5*dx}" y2="${y0+k*dy}" stroke="${k===0&&base===1?"var(--ink)":"var(--chart)"}" stroke-width="${k===0&&base===1?6:2}"/>`;
-  if(base>1) s+=`<text x="${x0+5*dx+7}" y="${y0+dy*0.5+5}" font-size="13" fill="var(--muted)" font-family="var(--font)">${base}fr</text>`;
+  s+=`<rect x="${L}" y="${top-12}" width="${cols*sp}" height="${gap*5+24}" rx="6" fill="var(--board)"/>`;
+  for(let f=0;f<=cols;f++){ const x=L+f*sp, nut=f===0&&base===1; s+=`<line x1="${x}" y1="${top-12}" x2="${x}" y2="${top+gap*5+12}" stroke="${nut?"var(--ink)":"var(--chart)"}" stroke-width="${nut?6:2}"/>`; }
+  if(base>1) s+=`<text x="${L+sp*0.5}" y="${top-18}" text-anchor="middle" font-size="12" fill="var(--muted)" font-family="var(--font)">${base}fr</text>`;
   for(let i=0;i<6;i++){
-    const f=fr[i], x=x0+i*dx;
-    if(f<0) s+=`<text x="${x}" y="${y0-12}" text-anchor="middle" font-size="15" font-weight="700" fill="var(--muted)" font-family="var(--font)">×</text>`;
-    else if(f===0) s+=`<circle cx="${x}" cy="${y0-16}" r="6" fill="none" stroke="var(--muted)" stroke-width="2"/>`;
-    else s+=`<circle cx="${x}" cy="${y0+(f-base+0.5)*dy}" r="9" fill="var(--accent)"/>`;
+    const strNum=6-i, y=top+i*gap, col=CHORD_SC[strNum];
+    s+=`<line x1="${L-22}" y1="${y}" x2="${L+cols*sp}" y2="${y}" stroke="${col}" stroke-opacity=".9" stroke-width="${1.1+(strNum-1)*0.42}"/>`;
+    s+=`<text x="4" y="${y+4.5}" font-size="12.5" font-weight="800" fill="${col}" font-family="var(--font)">${SLETTER[strNum]}</text>`;
+    const f=fr[i];
+    if(f<0){ s+=`<text x="${L-22}" y="${y+5}" text-anchor="middle" font-size="14" font-weight="700" fill="var(--muted)" font-family="var(--font)">×</text>`; continue; }
+    const isRoot=c.root!=null&&(OPEN[strNum]+f)%12===c.root, x=f===0?L-22:L+(f-base+0.5)*sp, lab=f===0?"0":(fingers[i]||"");
+    if(isRoot) s+=`<circle cx="${x}" cy="${y}" r="13" fill="none" stroke="var(--accent)" stroke-width="2.5"/>`;
+    s+=`<circle cx="${x}" cy="${y}" r="9" fill="${f===0?"none":col}" stroke="${f===0?"var(--muted)":"rgba(255,255,255,.85)"}" stroke-width="${f===0?2:1.5}"/>`;
+    if(lab) s+=`<text x="${x}" y="${y+4}" text-anchor="middle" font-size="11.5" font-weight="800" fill="${f===0?"var(--muted)":"#14110E"}" font-family="var(--font)">${lab}</text>`;
   }
   return s+"</svg>";
+}
+/* Plain-language "string / fret / finger" table to go under a chord diagram. */
+function chordTable(c){
+  const fingers=assignFingers(c.fr);
+  const rows=[6,5,4,3,2,1].map(s=>{
+    const i=6-s, f=c.fr[i];
+    const fret=f<0?"× don't play":f===0?"open":`fret ${f}`;
+    const finger=f>0&&fingers[i]?`finger ${fingers[i]}`:"—";
+    return `<tr><td>${SLETTER[s]} <span class="muted">(${SNAME[s]})</span></td><td>${fret}</td><td>${finger}</td></tr>`;
+  }).join("");
+  return `<table class="chordtbl"><thead><tr><th>String</th><th>Fret</th><th>Finger</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 /* ================= Lesson controller ================= */
@@ -1723,10 +1771,14 @@ const Lib = {
     const notes=Q.iv.map(i=>PC[(this.root+i)%12]).join("  ");
     const barre=c.minF>0&&c.fr.filter(f=>f===c.minF).length>=2&&!c.fr.some(f=>f===0);
     const tip0=barre?`This shape uses a barre: lay your index finger flat across fret ${c.minF}.`:c.fr.some(f=>f===0)?"Let the open strings ring clearly; arch your fingers so they don't touch them.":"";
-    $("cdetail").innerHTML=`<div>${chordSVG(c,1.5)}</div><div><div class="cname">${esc(c.n)}</div><div class="cfull">${esc(c.full)}</div><div class="cnotes">Notes in this chord: ${notes}</div>
+    $("cdetail").innerHTML=`<div class="tilt chordvis">${chordSVG(c,1.5)}</div><div><div class="cname">${esc(c.n)}</div><div class="cfull">${esc(c.full)}</div><div class="cnotes">Notes in this chord: ${notes}</div>
       <div class="shapes" role="group" aria-label="Chord shapes">${vs.map((x,i)=>`<button class="chipbtn" data-v="${i}" aria-pressed="${i===this.v}">Shape ${i+1}, ${shapeLabel(x)}</button>`).join("")}</div>
       <div class="acts"><button class="btn ghost" data-cact="hear">Hear it</button><button class="btn accent" data-cact="prac">Practise this chord</button><button class="btn ghost" data-cact="add">Add to my mix</button></div>
-      ${tip0?`<p class="hint" style="margin-top:12px">${tip0}</p>`:""}</div>`;
+      ${tip0?`<p class="hint" style="margin-top:12px">${tip0}</p>`:""}
+      <p class="legend"><span class="dot ring"></span>Root note (${PC[this.root]}) has a gold ring. The number in each dot is the finger to use; 0 is an open string; × means don't play that string.</p>
+      <h4 class="wx-h">Worked example — ${esc(c.n)}, ${shapeLabel(c)}</h4>
+      ${chordTable(c)}
+      </div>`;
   },
   click(e){
     const r=e.target.closest("[data-root]"), q=e.target.closest("[data-q]"), v=e.target.closest("[data-v]"), a=e.target.closest("[data-cact]");
