@@ -2,7 +2,7 @@
 
 Learn guitar by playing. Fretline listens through your microphone and tells you, note by note and chord by chord, whether you played it right.
 
-**Live app:** https://rahul7387.github.io/guitar-learning-app/
+**Live app:** [https://rahul7387.github.io/guitar-learning-app/](https://rahul7387.github.io/guitar-learning-app/)
 
 ## What's inside
 
